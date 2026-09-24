@@ -22,7 +22,7 @@
 //   VAPID，避免两边互相 unsubscribe 抢同一个 pushManager 订阅。
 // ═══════════════════════════════════════════════════════════════════
 const WORKER_URL = 'https://noir2.cc.cd';
-const CLIENT_TOKEN = 'weqwqewqeqwdcsccagdgs32132';
+const CLIENT_TOKEN = '';
 // ═══════════════════════════════════════════════════════════════════
 
 // ── 全局停用开关（KILL SWITCH）─────────────────────────────────────
