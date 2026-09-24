@@ -67,7 +67,7 @@ class D1Shim {
 
 // ─── 环境（与 CF Dashboard 部署一致的 env） ───
 const vapidKeys = webpush.generateVAPIDKeys();
-const SERVER_TOKEN = 'launch-check-shared-secret';
+const SERVER_TOKEN = crypto.randomBytes(24).toString('hex');
 const d1 = new D1Shim();
 const env = {
   AMSG_MASTER_KEY: crypto.randomBytes(32).toString('hex'),
