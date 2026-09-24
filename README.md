@@ -1,4 +1,7 @@
 # SullyOS·糯米机
+
+> 此仓库是 SullyOS 的独立公开源码快照，基于私人仓库 master 的 7f025314（2026-09-24）。它不会自动同步原仓库的更新，也不包含原仓库的 Actions Secrets、发布包或签名凭据。使用前请自行配置服务与 API。仓库中的自动工作流已关闭。
+
 <div align="center">
 <img width="800" alt="banner" src="https://cdn.jsdelivr.net/gh/qegj567-cloud/SullyOS-assets@main/bgm/SULLY/sDN.png" />
 </div>
