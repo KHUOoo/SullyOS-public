@@ -1,0 +1,88 @@
+name: Android Release APK
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+    branches:
+      - 'publish/v[0-9]+.[0-9]+.[0-9]+'
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-apk:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android/app/release.keystore
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            TAG="$GITHUB_REF_NAME"
+          else
+            TAG="${GITHUB_REF_NAME#publish/}"
+          fi
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid release tag: $TAG"; exit 1; }
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Validate signing secrets
+        env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+        run: |
+          test -n "$ANDROID_KEYSTORE" || { echo 'Missing ANDROID_KEYSTORE secret'; exit 1; }
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo 'Missing ANDROID_KEYSTORE_PASSWORD secret'; exit 1; }
+          test -n "$ANDROID_KEY_ALIAS" || { echo 'Missing ANDROID_KEY_ALIAS secret'; exit 1; }
+          test -n "$ANDROID_KEY_PASSWORD" || { echo 'Missing ANDROID_KEY_PASSWORD secret'; exit 1; }
+          printf '%s' "$ANDROID_KEYSTORE" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:android:web
+      - run: pnpm exec cap sync android
+      - run: node scripts/set-android-version.mjs "${RELEASE_TAG}"
+
+      - name: Build signed release APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Verify APK signature and stage asset
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK"
+          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify --verbose "$APK"
+          cp "$APK" "SullyOS-${RELEASE_TAG}.apk"
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ASSET="SullyOS-${RELEASE_TAG}.apk"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$ASSET" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$ASSET" --title "SullyOS ${RELEASE_TAG}" --generate-notes --target "$GITHUB_SHA"
+          fi
